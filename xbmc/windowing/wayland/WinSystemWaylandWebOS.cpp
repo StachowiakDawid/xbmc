@@ -33,6 +33,9 @@
 namespace
 {
 constexpr const char* LUNA_REGISTER_APP = "luna://com.webos.service.applicationmanager/registerApp";
+// webOS 1.x/2.x
+constexpr const char* LUNA_REGISTER_NATIVE_APP_LEGACY =
+    "luna://com.webos.applicationManager/registerNativeApp";
 
 constexpr unsigned int WIDTH_1080P = 1920;
 constexpr unsigned int HEIGHT_1080P = 1080;
@@ -201,8 +204,28 @@ bool CWinSystemWaylandWebOS::OnAppLifecycleEvent(LSHandle* sh, LSMessage* reply)
   CVariant event;
   CJSONVariantParser::Parse(msg, event);
 
+  // Older webOS has no registerApp; register through the legacy API to get relaunch events
+  if (!m_legacyRequestContext && event.isMember("returnValue") &&
+      !event["returnValue"].asBoolean() &&
+      event["errorText"].asString().find("Service does not exist") != std::string::npos)
+  {
+    CLog::Log(LOGINFO, "registerApp unavailable, falling back to legacy registerNativeApp");
+    m_legacyRequestContext.reset(new HContext());
+    m_legacyRequestContext->pub = true;
+    m_legacyRequestContext->multiple = true;
+    m_legacyRequestContext->callback = &OnAppLifecycleEventWrapper;
+    m_legacyRequestContext->userdata = this;
+    if (HLunaServiceCall(LUNA_REGISTER_NATIVE_APP_LEGACY, "{}", m_legacyRequestContext.get()))
+    {
+      CLog::LogF(LOGWARNING, "Legacy registerNativeApp call failed");
+      m_legacyRequestContext = nullptr;
+    }
+    return true;
+  }
+
   IShellSurface* shellSurface = GetShellSurface();
-  if (event["event"] == "relaunch" && shellSurface)
+  // registerNativeApp reports the event in "message"
+  if ((event["event"] == "relaunch" || event["message"] == "relaunch") && shellSurface)
     shellSurface->SetFullScreen(nullptr, 60.0f);
 
   return true;

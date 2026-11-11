@@ -15,6 +15,10 @@
 #include "utils/StringUtils.h"
 #include "utils/log.h"
 
+#if defined(TARGET_WEBOS)
+#include "platform/linux/WebOSTVPlatformConfig.h"
+#endif
+
 #include <array>
 #include <memory>
 #include <mutex>
@@ -934,7 +938,13 @@ bool CAESinkPULSE::Initialize(AEAudioFormat &format, std::string &device)
   m_BytesPerSecond = pa_bytes_per_second(&spec);
   unsigned int frameSize = pa_frame_size(&spec);
 
-  m_Stream = pa_stream_new_extended(m_Context, "kodi audio stream", info, 1, NULL);
+#if defined(TARGET_WEBOS)
+  // pa_stream_new_extended() crashes the PulseAudio 2.1 daemon of webOS 1.x
+  if (!m_passthrough && WebOSTVPlatformConfig::GetWebOSVersion() < 5)
+    m_Stream = pa_stream_new(m_Context, "kodi audio stream", &spec, &map);
+  else
+#endif
+    m_Stream = pa_stream_new_extended(m_Context, "kodi audio stream", info, 1, NULL);
   pa_format_info_free(info[0]);
 
   if (m_Stream == NULL)

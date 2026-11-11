@@ -71,6 +71,8 @@ private:
 
   std::unique_ptr<HContext, int (*)(HContext*)> m_requestContext{new HContext(),
                                                                  HUnregisterServiceCallback};
+  std::unique_ptr<HContext, int (*)(HContext*)> m_legacyRequestContext{nullptr,
+                                                                       HUnregisterServiceCallback};
 };
 
 } // namespace KODI::WINDOWING::WAYLAND
