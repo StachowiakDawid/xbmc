@@ -84,6 +84,14 @@ public:
   {
     wayland::event_queue_t queueCopy{queue};
 
+    // Called while dispatching, e.g. when a wl_seat is announced at runtime. Waiting for
+    // ourselves to service the request would deadlock.
+    if (IsCurrentThread())
+    {
+      m_display.roundtrip_queue(queueCopy);
+      return;
+    }
+
     // Serialize invocations of this function - it's used very rarely and usually
     // not in parallel anyway, and doing it avoids lots of complications
     std::unique_lock lock(m_roundtripQueueMutex);
